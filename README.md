@@ -15,11 +15,20 @@
 
 > /wlist unbind <玩家名> // 解除一个玩家对应的IP的绑定
 
+配置文件:`wlist.json`
+
+```json
+{
+  "玩家名": "IP", # 绑定了IP
+  "玩家名": null # 未绑定IP
+}
+```
+
 ## 感谢
 
-借鉴了豆沙部分(BetterWhiteList)[https://gitee.com/Crafty/BetterWhitelist]的源码，在此表示感谢
+借鉴了豆沙部分[BetterWhiteList](https://gitee.com/Crafty/BetterWhitelist)的源码，在此表示感谢
 
-使用了(PluginTemplate)[https://github.com/TShockResources/PluginTemplate]作为模板进行开发
+使用了[PluginTemplate](https://github.com/TShockResources/PluginTemplate)作为模板进行开发
 
 ## 用途
 
