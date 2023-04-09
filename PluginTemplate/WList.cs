@@ -2,6 +2,7 @@
 using Terraria;
 using TShockAPI;
 using TShockAPI.Hooks;
+using Rests;
 
 namespace WList;
 
@@ -15,7 +16,7 @@ public class WList : TerrariaPlugin
 
     public override string Author => "StarryCloud";
 
-    public override string Description => "一个测试白名单插件";
+    public override string Description => "一个绑定IP的白名单插件";
 
     public WList(Main game) : base(game) { }
 
@@ -33,6 +34,10 @@ public class WList : TerrariaPlugin
         );
         ServerApi.Hooks.ServerJoin.Register(this, OnPlayerJoin);
         ServerApi.Hooks.NetGreetPlayer.Register(this, OnGreetPlayer);
+        TShock.RestApi.Register(new SecureRestCommand("/wlist/add", RESTAdd, "wlist.rest"));
+        TShock.RestApi.Register(new SecureRestCommand("/wlist/del", RESTDel, "wlist.rest"));
+        TShock.RestApi.Register(new SecureRestCommand("/wlist/unbind", RESTUnbind, "wlist.rest"));
+        TShock.RestApi.Register(new SecureRestCommand("/wlist/list", RESTGetPlayer, "wlist.rest"));
         GeneralHooks.ReloadEvent += args =>
         {
             config = Config.Load(config_path);
@@ -64,7 +69,7 @@ public class WList : TerrariaPlugin
                         string username = args.Parameters[1];
                         if (!config.WhiteList.ContainsKey(username))
                         {
-                            config.WhiteList.Add(username, null);
+                            config.WhiteList.Add(username, new PlayerConfig());
                             Config.Write(config_path, config);
                             user.SendSuccessMessage($"添加{username}的白名单成功！");
                         }
@@ -104,7 +109,7 @@ public class WList : TerrariaPlugin
                         string username = args.Parameters[1];
                         if (config.WhiteList.ContainsKey(username))
                         {
-                            config.WhiteList[username] = null;
+                            config.WhiteList[username].IP = null;
                             Config.Write(config_path, config);
                             user.SendSuccessMessage($"解除{username}与其IP的绑定成功！");
                         }
@@ -162,7 +167,7 @@ public class WList : TerrariaPlugin
                     user.SendInfoMessage(back_info);
                     break;
                 case "help":
-                    user.SendInfoMessage("wlist 帮助\n/wlist add <玩家名> 添加白名单\n/wlist del <玩家名> 删除白名单\n/wlist list 显示白名单列表\n/wlist unbind <玩家名> 解绑玩家IP");
+                    user.SendInfoMessage("wlist 帮助\n/wlist add <玩家名> 添加白名单\n/wlist del <玩家名> 删除白名单\n/wlist list 显示白名单列表\n/wlist unbind <玩家名> 解绑玩家IP\n权限:wlist.admin");
                     break;
                 default:
                     user.SendErrorMessage("格式错误!请使用/wlist help获取帮助");
@@ -174,19 +179,48 @@ public class WList : TerrariaPlugin
             user.SendErrorMessage("格式错误!请使用/wlist help获取帮助");
         }
     }
-
+    private RestObject RESTAdd(RestRequestArgs args)
+    {
+        string name = args.Parameters["name"];
+        if (name == null) { return new RestObject("400") { { "error", config.lang.ErrorArgs } }; }
+        if (!config.WhiteList.ContainsKey(name)) { return new RestObject("400") { { "error", config.lang.HasNotPlayer } }; }
+        config.WhiteList.Add(name, new PlayerConfig());
+        Config.Write(config_path, config);
+        return new RestObject() { { "response",config.lang.SuccessRestAdd } };
+    }
+    private RestObject RESTDel(RestRequestArgs args)
+    {
+        string name = args.Parameters["name"];
+        if (name == null) { return new RestObject("400") { { "error", config.lang.ErrorArgs } }; }
+        if (!config.WhiteList.ContainsKey(name)) { return new RestObject("400") { { "error", config.lang.HasNotPlayer } }; }
+        config.WhiteList.Remove(name);
+        Config.Write(config_path, config);
+        return new RestObject() { { "response", config.lang.SuccessRestDel } };
+    }
+    private RestObject RESTUnbind(RestRequestArgs args)
+    {
+        string name = args.Parameters["name"];
+        if (name == null) { return new RestObject("400") { { "error", config.lang.ErrorArgs } }; }
+        config.WhiteList[name].IP = null;
+        Config.Write(config_path, config);
+        return new RestObject() { { "response", config.lang.SuccessRestUnbind } };
+    }
+    private RestObject RESTGetPlayer(RestRequestArgs args)
+    {
+        return new RestObject() { { "response", config.WhiteList} };
+    }
     private void OnPlayerJoin(JoinEventArgs args)
     {
         TSPlayer player = new TSPlayer(args.Who);
         if (!config.WhiteList.ContainsKey(player.Name))
         {
-            player.Disconnect("你不在白名单内！");
+            player.Disconnect(config.lang.NotWhitelist);
         }
         else
         {
-            if (config.WhiteList[player.Name] != player.IP && config.WhiteList[player.Name] != null)
+            if (config.WhiteList[player.Name].IP != player.IP && config.WhiteList[player.Name] != null)
             {
-                player.Disconnect("你的IP与之前的IP不同，请联系管理员解决");
+                player.Disconnect(config.lang.NotMatch);
                 TShock.Log.ConsoleWarn($"玩家{player.Name}的IP改变");
             }
         }
@@ -196,10 +230,10 @@ public class WList : TerrariaPlugin
         TSPlayer player = new TSPlayer(args.Who);
         if (config.WhiteList[player.Name] == null)
         {
-            config.WhiteList[player.Name] = player.IP;
+            config.WhiteList[player.Name].IP = player.IP;
             Config.Write(config_path, config);
-            player.SendSuccessMessage($"你的IP已绑定为=>{player.IP},如要解绑请联系管理员");
-            TShock.Log.ConsoleInfo($"玩家{player.Name}的IP已绑定为{player.IP}");
+            player.SendSuccessMessage($"你的IP已绑定,如要解绑请联系管理员");
+            TShock.Log.ConsoleInfo($"玩家{player.Name}的IP已绑定");
         }
     }
 }
